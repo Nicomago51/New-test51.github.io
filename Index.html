@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lector NFC - Pulsera Bariloche</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    button {
+      background-color: #00e676;
+      color: #000;
+      border: none;
+      padding: 15px 30px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 25px;
+    }
+    button:active {
+      transform: scale(0.97);
+    }
+    #caja-estado {
+      background-color: #1e1e1e;
+      border: 2px solid #333;
+      border-radius: 16px;
+      padding: 25px;
+      width: 100%;
+      max-width: 350px;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .bariloche {
+      border-color: #00b0ff !important;
+      background-color: #002b40 !important;
+    }
+    .tag-detectado {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-top: 10px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <button id="btn-escanear">Activar Lector NFC</button>
+
+  <div id="caja-estado">
+    <div id="mensaje">Tocá el botón y acercá la pulsera al celu</div>
+    <div id="detalle" class="tag-detectado"></div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('btn-escanear');
+    const caja = document.getElementById('caja-estado');
+    const mensaje = document.getElementById('mensaje');
+    const detalle = document.getElementById('detalle');
+
+    btn.addEventListener('click', async () => {
+      // Web NFC solo anda en Chrome/Edge para Android y bajo HTTPS (o localhost)
+      if (!('NDEFReader' in window)) {
+        mensaje.textContent = 'Tu navegador o dispositivo no soporta Web NFC (probá en Chrome en Android).';
+        return;
+      }
+
+      try {
+        const ndef = new NDEFReader();
+        await ndef.scan();
+        mensaje.textContent = 'Escaneando... Acercá la pulsera atrás del teléfono.';
+        detalle.textContent = '';
+        caja.classList.remove('bariloche');
+
+        ndef.onreading = ({ message, serialNumber }) => {
+          const decoder = new TextDecoder();
+          let textoLeido = '';
+
+          // Extraer todo el texto grabado en los registros de la etiqueta
+          for (const record of message.records) {
+            if (record.recordType === 'text' || record.recordType === 'url') {
+              textoLeido += decoder.decode(record.data) + ' ';
+            }
+          }
+
+          textoLeido = textoLeido.trim();
+
+          // Chequea si "66.047" (o "66047" por las dudas) está en el contenido o en el serial
+          const esPulseraBrc = 
+            textoLeido.includes('66.047') || 
+            textoLeido.includes('66047') || 
+            (serialNumber && serialNumber.includes('66.047'));
+
+          if (esPulseraBrc) {
+            caja.classList.add('bariloche');
+            mensaje.innerHTML = '🏔️ <strong>¡TEST OK!</strong><br><br>Reconoció la pulsera de Bariloche (66.047) xd';
+          } else {
+            caja.classList.remove('bariloche');
+            mensaje.textContent = 'Etiqueta NFC detectada, pero no es la de Bariloche.';
+          }
+
+          detalle.textContent = `Contenido: "${textoLeido || 'Vacío'}" | Serial: ${serialNumber || 'N/A'}`;
+        };
+
+        ndef.onreadingerror = () => {
+          mensaje.textContent = 'Error al leer el chip, probá acercarlo de nuevo.';
+        };
+
+      } catch (error) {
+        mensaje.textContent = `Error: ${error.message}`;
+      }
+    });
+  </script>
+
+</body>
+</html>
